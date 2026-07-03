@@ -122,7 +122,9 @@
   .kcol-body.drag-over{background:#F0F4FF;border-radius:10px;}
   .kcol-empty{font-size:12px;color:var(--muted-2);text-align:center;padding:20px 10px;}
 
-  .tcard{background:#FBFBFC;border:1px solid var(--border);border-left:3px solid var(--pcolor,#999);border-radius:9px;padding:10px 11px;cursor:grab;transition:box-shadow .12s ease, transform .12s ease;}
+  .tcard{background:#FBFBFC;border:1px solid var(--border);border-left:3px solid var(--pcolor,#999);border-radius:9px;padding:10px 11px;cursor:grab;transition:box-shadow .12s ease, transform .12s ease, background-color .12s ease;}
+  .tcard.due-soon{background:#FFF3E0;}
+  .tcard.overdue{background:#FDECEA;}
   .tcard:hover{box-shadow:0 2px 6px rgba(16,24,40,0.08);}
   .tcard.dragging{opacity:.4;}
   .tcard .tc-top{display:flex;justify-content:space-between;align-items:flex-start;gap:6px;}
@@ -130,6 +132,9 @@
   .tcard .tc-company{display:inline-block;margin-top:6px;font-size:10.5px;font-weight:600;padding:2px 7px;border-radius:5px;background:#EEF1F5;color:var(--muted);}
   .tcard .tc-desc{font-size:11.5px;color:var(--muted);margin-top:6px;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
   .tcard .tc-dates{font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--muted-2);margin-top:7px;}
+  .tc-due{font-family:'JetBrains Mono',monospace;font-size:10.5px;font-weight:700;margin-top:4px;}
+  .tc-due.due-soon{color:#B45309;}
+  .tc-due.overdue{color:#C0392B;}
 
   .modal-overlay{position:fixed;inset:0;background:rgba(22,27,34,0.45);display:flex;align-items:center;justify-content:center;z-index:100;padding:20px;}
   .modal{background:var(--panel);border-radius:var(--radius);width:100%;max-width:460px;padding:22px;box-shadow:0 12px 32px rgba(0,0,0,0.18);max-height:90vh;overflow-y:auto;}
@@ -257,10 +262,16 @@
         <h2>Tarefas</h2>
         <div class="subtitle">Backlog → Fazendo → Feito</div>
       </div>
-      <div class="priority-legend">
-        <span><span class="dot" style="background:#E5484D"></span>urgente</span>
-        <span><span class="dot" style="background:#F5A524"></span>moderado</span>
-        <span><span class="dot" style="background:#2DA44E"></span>não urgente</span>
+      <div style="display:flex;gap:20px;align-items:center;flex-wrap:wrap;">
+        <div class="priority-legend">
+          <span><span class="dot" style="background:#E5484D"></span>urgente</span>
+          <span><span class="dot" style="background:#F5A524"></span>moderado</span>
+          <span><span class="dot" style="background:#2DA44E"></span>não urgente</span>
+        </div>
+        <div class="priority-legend">
+          <span><span class="dot" style="background:#FFF3E0;border:1px solid #FCD9A8;"></span>prazo próximo</span>
+          <span><span class="dot" style="background:#FDECEA;border:1px solid #F5B7B1;"></span>atrasada</span>
+        </div>
       </div>
     </div>
     <div class="kanban-board" id="kanbanBoard"></div>
@@ -411,6 +422,7 @@
       await apiFetch('/api/config', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(config)});
       status.textContent = 'salvo — sincronizando ✓';
       renderLegend();
+      renderKanban();
       setTimeout(()=> loadEvents(), 1500);
     }catch(err){
       status.textContent = '';
@@ -616,6 +628,23 @@
     return d+'/'+m;
   }
 
+  function dueStatus(t){
+    if(!t.end_date || t.status === 'feito') return {cls:'', label:''};
+    const today = new Date(); today.setHours(0,0,0,0);
+    const [y,m,d] = t.end_date.split('-').map(Number);
+    if(!y || !m || !d) return {cls:'', label:''};
+    const end = new Date(y, m-1, d);
+    const diffDays = Math.round((end - today) / (1000*60*60*24));
+
+    if(diffDays < 0){
+      const n = Math.abs(diffDays);
+      return {cls:'overdue', label: (n===1 ? '1 dia atrasado' : n+' dias atrasado')};
+    }
+    if(diffDays === 0) return {cls:'due-soon', label:'vence hoje'};
+    if(diffDays <= 2) return {cls:'due-soon', label: (diffDays===1 ? 'falta 1 dia' : 'faltam '+diffDays+' dias')};
+    return {cls:'', label:''};
+  }
+
   function renderKanban(){
     const board = document.getElementById('kanbanBoard');
     board.innerHTML = '';
@@ -648,7 +677,8 @@
 
       colTasks.forEach(t => {
         const card = document.createElement('div');
-        card.className = 'tcard';
+        const due = dueStatus(t);
+        card.className = 'tcard' + (due.cls ? ' ' + due.cls : '');
         card.draggable = true;
         card.style.setProperty('--pcolor', PRIORITY_COLOR[t.priority] || '#999');
         card.dataset.id = t.id;
@@ -660,6 +690,7 @@
           ${t.company ? `<span class="tc-company">${escapeHtml(t.company)}</span>` : ''}
           ${t.description ? `<div class="tc-desc">${escapeHtml(t.description)}</div>` : ''}
           ${dates ? `<div class="tc-dates">${dates}</div>` : ''}
+          ${due.label ? `<div class="tc-due ${due.cls}">${due.label}</div>` : ''}
         `;
         card.addEventListener('click', ()=> openTaskModal(t));
         card.addEventListener('dragstart', ()=>{ draggedTaskId = t.id; card.classList.add('dragging'); });
