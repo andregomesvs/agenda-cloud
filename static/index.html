@@ -1,0 +1,905 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agenda Consolidada</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#F5F6F8; --panel:#FFFFFF; --border:#E4E7EC; --text:#161B22;
+    --muted:#68707C; --muted-2:#9AA2AC; --today-ring:#161B22;
+    --radius:14px; --shadow: 0 1px 2px rgba(16,24,40,0.04), 0 1px 3px rgba(16,24,40,0.06);
+    --ok:#12805C; --err:#D0342C;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--text);-webkit-font-smoothing:antialiased;padding:28px 24px 60px;}
+  .wrap{max-width:1180px;margin:0 auto;}
+
+  header.top{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:14px;}
+  .title-block .eyebrow{font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted-2);margin-bottom:4px;display:flex;align-items:center;gap:8px;}
+  .live-dot{width:7px;height:7px;border-radius:50%;background:var(--ok);display:inline-block;animation:pulse 2s infinite;}
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.35;}}
+  h1{font-size:26px;font-weight:800;margin:0;letter-spacing:-0.01em;}
+  .subtitle{color:var(--muted);font-size:13px;margin-top:4px;}
+
+  .stats{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+  .stat-pill{background:var(--panel);border:1px solid var(--border);border-radius:999px;padding:7px 14px;font-size:12.5px;display:flex;align-items:center;gap:7px;box-shadow:var(--shadow);}
+  .dot{width:8px;height:8px;border-radius:50%;flex:none;}
+  .refresh-btn{background:var(--panel);border:1px solid var(--border);border-radius:999px;padding:7px 14px;font-size:12.5px;font-weight:600;cursor:pointer;box-shadow:var(--shadow);display:flex;align-items:center;gap:6px;}
+  .refresh-btn:hover{opacity:.8;}
+  .refresh-btn.spinning svg{animation:spin 0.8s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+
+  .error-banner{background:#FFF4F3;border:1px solid #F6C9C4;color:var(--err);border-radius:10px;padding:10px 14px;font-size:12.5px;margin-bottom:14px;}
+
+  .settings-toggle{display:inline-flex;align-items:center;gap:8px;background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:9px 14px;font-size:13.5px;font-weight:600;cursor:pointer;box-shadow:var(--shadow);margin-bottom:14px;user-select:none;}
+  .settings-toggle svg{transition:transform .2s ease;}
+  .settings-toggle.open svg{transform:rotate(180deg);}
+  .settings-panel{display:none;background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:22px;box-shadow:var(--shadow);}
+  .settings-panel.open{display:block;}
+  .settings-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;}
+  @media (max-width:820px){.settings-grid{grid-template-columns:1fr;}}
+  .acct-card{border:1px solid var(--border);border-radius:12px;padding:16px;background:#FBFBFC;position:relative;}
+  .acct-remove{position:absolute;top:12px;right:12px;width:22px;height:22px;border-radius:6px;border:1px solid var(--border);background:#fff;color:var(--muted-2);cursor:pointer;font-size:13px;line-height:1;display:flex;align-items:center;justify-content:center;}
+  .acct-remove:hover{background:#FFF4F3;color:var(--err);border-color:#F6C9C4;}
+  .acct-head{display:flex;align-items:center;gap:10px;margin-bottom:12px;padding-right:26px;}
+  .acct-head input[type=text]{font-weight:700;font-size:14.5px;border:none;background:transparent;outline:none;width:100%;color:var(--text);}
+  input[type=color]{width:28px;height:28px;border:none;padding:0;border-radius:6px;background:none;cursor:pointer;flex:none;}
+  .field-label{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted-2);margin:10px 0 5px;font-weight:600;}
+  input[type=url]{width:100%;border:1px solid var(--border);border-radius:8px;padding:9px 10px;font-family:'JetBrains Mono',monospace;font-size:11.5px;background:#fff;color:var(--text);}
+  .settings-footer{display:flex;align-items:center;justify-content:space-between;margin-top:16px;flex-wrap:wrap;gap:10px;}
+  .refresh-interval{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted);}
+  .refresh-interval select{border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:12.5px;}
+  .btn{border:none;border-radius:8px;padding:9px 16px;font-size:13px;font-weight:600;cursor:pointer;}
+  .btn-primary{background:var(--text);color:#fff;}
+  .btn-primary:hover{opacity:.85;}
+  .save-status{font-size:12px;color:var(--ok);}
+  .hint{font-size:12px;color:var(--muted-2);margin-top:14px;line-height:1.5;}
+
+  .controls{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:12px;}
+  .nav{display:flex;align-items:center;gap:6px;}
+  .nav button{width:32px;height:32px;border-radius:8px;border:1px solid var(--border);background:var(--panel);cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:var(--shadow);}
+  .nav .month-label{font-weight:700;font-size:16px;min-width:170px;text-align:center;text-transform:capitalize;}
+  .nav .today-btn{width:auto;padding:0 12px;font-size:12.5px;font-weight:600;color:var(--muted);}
+  .view-toggle{display:flex;background:var(--panel);border:1px solid var(--border);border-radius:9px;padding:3px;box-shadow:var(--shadow);}
+  .view-toggle button{border:none;background:transparent;padding:6px 14px;font-size:12.5px;font-weight:600;color:var(--muted);border-radius:6px;cursor:pointer;}
+  .view-toggle button.active{background:var(--text);color:#fff;}
+  .legend{display:flex;gap:14px;align-items:center;}
+  .legend label{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--muted);cursor:pointer;}
+
+  .cal-panel{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;}
+  .weekdays{display:grid;grid-template-columns:repeat(7,1fr);border-bottom:1px solid var(--border);}
+  .weekdays div{padding:10px 0;text-align:center;font-size:11px;font-weight:700;color:var(--muted-2);text-transform:uppercase;letter-spacing:.05em;}
+  .grid{display:grid;grid-template-columns:repeat(7,1fr);}
+  .cell{min-height:104px;border-right:1px solid var(--border);border-bottom:1px solid var(--border);padding:6px 6px 8px;cursor:pointer;position:relative;transition:background .12s ease;}
+  .cell:nth-child(7n){border-right:none;}
+  .cell:hover{background:#FAFBFC;}
+  .cell.out{background:#FBFBFC;}
+  .cell.out .daynum{color:var(--muted-2);}
+  .cell.selected{background:#F0F4FF;}
+  .daynum{font-size:12.5px;font-weight:600;color:var(--text);display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;}
+  .cell.today .daynum{background:var(--today-ring);color:#fff;}
+  .chip{font-size:10.8px;padding:2px 6px;border-radius:5px;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#fff;font-weight:600;}
+  .more{font-size:10.5px;color:var(--muted);margin-top:3px;font-weight:600;}
+
+  .agenda-list{padding:6px 0;}
+  .agenda-day{padding:14px 20px;border-bottom:1px solid var(--border);}
+  .agenda-day:last-child{border-bottom:none;}
+  .agenda-day-label{font-size:12.5px;font-weight:700;color:var(--muted);margin-bottom:8px;text-transform:capitalize;}
+  .agenda-evt{display:flex;gap:10px;align-items:flex-start;padding:6px 0;}
+  .agenda-evt .bar{width:3px;border-radius:2px;align-self:stretch;flex:none;}
+  .agenda-evt .time{font-family:'JetBrains Mono',monospace;font-size:11.5px;color:var(--muted);min-width:96px;padding-top:1px;}
+  .agenda-evt .body .sum{font-size:13.5px;font-weight:600;}
+  .agenda-evt .body .loc{font-size:12px;color:var(--muted-2);margin-top:1px;}
+  .empty-state{padding:50px 20px;text-align:center;color:var(--muted-2);font-size:13.5px;}
+
+  .detail{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);margin-top:16px;padding:18px 20px;box-shadow:var(--shadow);}
+  .detail h3{margin:0 0 12px;font-size:14.5px;text-transform:capitalize;}
+  .detail .none{color:var(--muted-2);font-size:13px;}
+
+  /* ---------- KANBAN ---------- */
+  .kanban-section{margin-top:40px;}
+  .kanban-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px;}
+  .kanban-header h2{font-size:18px;font-weight:800;margin:0;letter-spacing:-0.01em;}
+  .kanban-header .subtitle{color:var(--muted);font-size:12.5px;margin-top:3px;}
+  .priority-legend{display:flex;gap:12px;align-items:center;}
+  .priority-legend span{display:flex;align-items:center;gap:5px;font-size:11.5px;color:var(--muted);}
+  .priority-legend .dot{width:8px;height:8px;border-radius:50%;}
+
+  .kanban-board{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;}
+  @media (max-width:820px){.kanban-board{grid-template-columns:1fr;}}
+
+  .kcol{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);display:flex;flex-direction:column;min-height:120px;}
+  .kcol-head{display:flex;align-items:center;justify-content:space-between;padding:14px 14px 10px;}
+  .kcol-title{font-size:13px;font-weight:700;display:flex;align-items:center;gap:8px;}
+  .kcol-title .count{font-family:'JetBrains Mono',monospace;font-weight:500;color:var(--muted-2);font-size:11.5px;}
+  .kcol-add{width:24px;height:24px;border-radius:7px;border:1px solid var(--border);background:#FBFBFC;cursor:pointer;font-size:15px;line-height:1;color:var(--muted);display:flex;align-items:center;justify-content:center;}
+  .kcol-add:hover{background:#F0F1F3;}
+  .kcol-body{flex:1;padding:0 10px 10px;display:flex;flex-direction:column;gap:8px;min-height:60px;transition:background .12s ease;}
+  .kcol-body.drag-over{background:#F0F4FF;border-radius:10px;}
+  .kcol-empty{font-size:12px;color:var(--muted-2);text-align:center;padding:20px 10px;}
+
+  .tcard{background:#FBFBFC;border:1px solid var(--border);border-left:3px solid var(--pcolor,#999);border-radius:9px;padding:10px 11px;cursor:grab;transition:box-shadow .12s ease, transform .12s ease;}
+  .tcard:hover{box-shadow:0 2px 6px rgba(16,24,40,0.08);}
+  .tcard.dragging{opacity:.4;}
+  .tcard .tc-top{display:flex;justify-content:space-between;align-items:flex-start;gap:6px;}
+  .tcard .tc-title{font-size:13px;font-weight:700;line-height:1.3;}
+  .tcard .tc-company{display:inline-block;margin-top:6px;font-size:10.5px;font-weight:600;padding:2px 7px;border-radius:5px;background:#EEF1F5;color:var(--muted);}
+  .tcard .tc-desc{font-size:11.5px;color:var(--muted);margin-top:6px;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+  .tcard .tc-dates{font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--muted-2);margin-top:7px;}
+
+  .modal-overlay{position:fixed;inset:0;background:rgba(22,27,34,0.45);display:flex;align-items:center;justify-content:center;z-index:100;padding:20px;}
+  .modal{background:var(--panel);border-radius:var(--radius);width:100%;max-width:460px;padding:22px;box-shadow:0 12px 32px rgba(0,0,0,0.18);max-height:90vh;overflow-y:auto;}
+  .modal h3{margin:0 0 16px;font-size:16px;font-weight:800;}
+  .modal .field-label{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted-2);margin:12px 0 5px;font-weight:600;}
+  .modal input[type=text], .modal input[type=date], .modal textarea{width:100%;border:1px solid var(--border);border-radius:8px;padding:9px 10px;font-size:13px;font-family:'Inter',sans-serif;color:var(--text);background:#fff;}
+  .modal textarea{min-height:64px;resize:vertical;}
+  .modal .date-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .priority-picker{display:flex;gap:8px;margin-top:6px;}
+  .priority-opt{flex:1;border:1.5px solid var(--border);border-radius:8px;padding:8px 6px;text-align:center;font-size:11.5px;font-weight:700;cursor:pointer;color:var(--muted);}
+  .priority-opt[data-p=urgente]{border-color:#F3C7C6;}
+  .priority-opt[data-p=moderado]{border-color:#F6E0B0;}
+  .priority-opt[data-p=nao_urgente]{border-color:#C6E6D2;}
+  .priority-opt.selected[data-p=urgente]{background:#E5484D;border-color:#E5484D;color:#fff;}
+  .priority-opt.selected[data-p=moderado]{background:#F5A524;border-color:#F5A524;color:#fff;}
+  .priority-opt.selected[data-p=nao_urgente]{background:#2DA44E;border-color:#2DA44E;color:#fff;}
+  .modal-footer{display:flex;justify-content:space-between;align-items:center;margin-top:20px;}
+  .btn-danger{background:transparent;color:var(--err);border:none;font-size:12.5px;font-weight:600;cursor:pointer;padding:8px 4px;}
+  .btn-danger:hover{text-decoration:underline;}
+  .modal-actions{display:flex;gap:8px;}
+  .btn-ghost2{background:transparent;color:var(--muted);border:1px solid var(--border);border-radius:8px;padding:9px 16px;font-size:13px;font-weight:600;cursor:pointer;}
+  .modal-error{color:var(--err);font-size:12px;margin-top:8px;display:none;}
+
+  /* ---------- LOGIN ---------- */
+  .login-overlay{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:200;padding:20px;}
+  .login-card{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:36px 32px;max-width:360px;width:100%;text-align:center;}
+  .login-card h1{font-size:20px;font-weight:800;margin:0 0 6px;}
+  .login-card p{color:var(--muted);font-size:13px;margin:0 0 24px;}
+  .google-btn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;border:1px solid var(--border);border-radius:9px;padding:11px 16px;font-size:13.5px;font-weight:600;background:#fff;cursor:pointer;color:var(--text);}
+  .google-btn:hover{background:#FAFBFC;}
+  .login-error{color:var(--err);font-size:12.5px;margin-top:16px;display:none;}
+  .login-hint{color:var(--muted-2);font-size:11.5px;margin-top:18px;line-height:1.5;}
+  .user-chip{display:flex;align-items:center;gap:8px;background:var(--panel);border:1px solid var(--border);border-radius:999px;padding:5px 12px 5px 5px;font-size:12px;font-weight:600;color:var(--muted);box-shadow:var(--shadow);}
+  .user-chip img{width:22px;height:22px;border-radius:50%;}
+  .user-chip button{border:none;background:transparent;color:var(--muted-2);font-size:11.5px;cursor:pointer;margin-left:4px;text-decoration:underline;}
+  #appShell{display:none;}
+</style>
+</head>
+<body>
+
+<div class="login-overlay" id="loginOverlay">
+  <div class="login-card">
+    <h1>Agenda Consolidada</h1>
+    <p>Acesso restrito. Entre com a conta Google autorizada.</p>
+    <button class="google-btn" id="googleLoginBtn">
+      <svg width="18" height="18" viewBox="0 0 18 18"><path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 01-1.8 2.72v2.26h2.9c1.7-1.57 2.7-3.87 2.7-6.62z"/><path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.9-2.26c-.8.54-1.84.86-3.06.86-2.35 0-4.34-1.59-5.05-3.72H.96v2.33A9 9 0 009 18z"/><path fill="#FBBC05" d="M3.95 10.7A5.4 5.4 0 013.68 9c0-.59.1-1.16.27-1.7V4.97H.96A9 9 0 000 9c0 1.45.35 2.83.96 4.03l2.99-2.33z"/><path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58C13.46.89 11.43 0 9 0A9 9 0 00.96 4.97l2.99 2.33C4.66 5.17 6.65 3.58 9 3.58z"/></svg>
+      Entrar com Google
+    </button>
+    <div class="login-error" id="loginError"></div>
+    <div class="login-hint">Só o e-mail autorizado consegue ver ou editar os dados. Qualquer outro login é recusado pelo servidor.</div>
+  </div>
+</div>
+
+<div id="appShell">
+<div class="wrap">
+
+
+  <header class="top">
+    <div class="title-block">
+      <div class="eyebrow"><span class="live-dot"></span> sincronização automática · <span id="lastUpdated">carregando...</span></div>
+      <h1>Agenda Consolidada</h1>
+      <div class="subtitle">Puxando direto das duas contas Outlook em segundo plano.</div>
+    </div>
+    <div class="stats">
+      <div class="stats" id="stats"></div>
+      <button class="refresh-btn" id="refreshBtn">
+        <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M13.65 2.35A7 7 0 1015 8h-1.5" stroke="#161B22" stroke-width="1.4" stroke-linecap="round"/><path d="M15 2v4h-4" stroke="#161B22" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        atualizar agora
+      </button>
+      <div class="user-chip" id="userChip" style="display:none;"></div>
+    </div>
+  </header>
+
+  <div id="errorBanner" class="error-banner" style="display:none;"></div>
+
+  <div class="settings-toggle" id="settingsToggle">
+    <span>Configurar contas e link .ics</span>
+    <svg width="12" height="8" viewBox="0 0 12 8" fill="none"><path d="M1 1L6 6L11 1" stroke="#68707C" stroke-width="1.6" stroke-linecap="round"/></svg>
+  </div>
+
+  <div class="settings-panel" id="settingsPanel">
+    <div class="settings-grid" id="settingsGrid"></div>
+    <button class="btn-ghost2" id="addAccountBtn" style="margin-top:12px;">+ Adicionar conta</button>
+    <div class="settings-footer">
+      <div class="refresh-interval">
+        Atualizar a cada
+        <select id="intervalSelect">
+          <option value="2">2 min</option>
+          <option value="5">5 min</option>
+          <option value="10">10 min</option>
+          <option value="15">15 min</option>
+          <option value="30">30 min</option>
+        </select>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span class="save-status" id="saveStatus"></span>
+        <button class="btn btn-primary" id="saveBtn">Salvar e sincronizar</button>
+      </div>
+    </div>
+    <div class="hint">
+      Cole aqui o link .ics publicado de cada conta (Outlook Web → Configurações → Calendário → Calendários compartilhados → Publicar um calendário). O servidor local busca esses links automaticamente no intervalo escolhido — não precisa colar o conteúdo de novo.
+    </div>
+  </div>
+
+  <div class="controls">
+    <div class="nav">
+      <button id="prevBtn" title="Anterior">&#8249;</button>
+      <div class="month-label" id="monthLabel"></div>
+      <button id="nextBtn" title="Próximo">&#8250;</button>
+      <button class="today-btn" id="todayBtn">hoje</button>
+    </div>
+    <div class="legend" id="legend"></div>
+    <div class="view-toggle">
+      <button id="viewMonthBtn" class="active">Mês</button>
+      <button id="viewAgendaBtn">Agenda</button>
+    </div>
+  </div>
+
+  <div class="cal-panel" id="calPanel"></div>
+  <div class="detail" id="detailPanel" style="display:none;"></div>
+
+  <section class="kanban-section">
+    <div class="kanban-header">
+      <div>
+        <h2>Tarefas</h2>
+        <div class="subtitle">Backlog → Fazendo → Feito</div>
+      </div>
+      <div class="priority-legend">
+        <span><span class="dot" style="background:#E5484D"></span>urgente</span>
+        <span><span class="dot" style="background:#F5A524"></span>moderado</span>
+        <span><span class="dot" style="background:#2DA44E"></span>não urgente</span>
+      </div>
+    </div>
+    <div class="kanban-board" id="kanbanBoard"></div>
+  </section>
+
+</div>
+
+<div class="modal-overlay" id="taskModalOverlay" style="display:none;">
+  <div class="modal">
+    <h3 id="taskModalTitle">Nova tarefa</h3>
+    <input type="hidden" id="taskId">
+
+    <div class="field-label">Título</div>
+    <input type="text" id="taskTitle" placeholder="Ex: Ajustar pipeline de ingestão">
+
+    <div class="field-label">Empresa</div>
+    <input type="text" id="taskCompany" list="companyList" placeholder="Ex: Implanta, GFT...">
+    <datalist id="companyList"></datalist>
+
+    <div class="field-label">Descrição</div>
+    <textarea id="taskDescription" placeholder="Detalhes da tarefa..."></textarea>
+
+    <div class="date-row">
+      <div>
+        <div class="field-label">Data início</div>
+        <input type="date" id="taskStart">
+      </div>
+      <div>
+        <div class="field-label">Data fim</div>
+        <input type="date" id="taskEnd">
+      </div>
+    </div>
+
+    <div class="field-label">Prioridade</div>
+    <div class="priority-picker" id="priorityPicker">
+      <div class="priority-opt" data-p="urgente">Urgente</div>
+      <div class="priority-opt" data-p="moderado">Moderado</div>
+      <div class="priority-opt" data-p="nao_urgente">Não urgente</div>
+    </div>
+
+    <div class="modal-error" id="taskModalError"></div>
+
+    <div class="modal-footer">
+      <button class="btn-danger" id="deleteTaskBtn" style="display:none;">Excluir tarefa</button>
+      <div class="modal-actions" style="margin-left:auto;">
+        <button class="btn-ghost2" id="cancelTaskBtn">Cancelar</button>
+        <button class="btn btn-primary" id="saveTaskBtn">Salvar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const MESES = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+  const DIAS_SEMANA = ['dom','seg','ter','qua','qui','sex','sáb'];
+
+  let config = null;
+  let events = []; // eventos vindos do servidor, já com Date objects
+  let currentDate = new Date();
+  let selectedDay = null;
+  let view = 'month';
+  let visibility = {}; // por nome de conta
+
+  async function loadConfig(){
+    config = await apiFetch('/api/config');
+    document.getElementById('intervalSelect').value = String(config.refresh_minutes || 5);
+    config.accounts.forEach(a => { if(!(a.name in visibility)) visibility[a.name] = true; });
+    renderSettingsForm();
+    renderLegend();
+  }
+
+  async function loadEvents(){
+    const data = await apiFetch('/api/events');
+    events = (data.events||[]).map(e => ({...e, start: new Date(e.start), end: new Date(e.end)}));
+    const errBanner = document.getElementById('errorBanner');
+    const errKeys = Object.keys(data.errors||{});
+    if(errKeys.length){
+      errBanner.style.display='block';
+      errBanner.textContent = 'Não consegui sincronizar: ' + errKeys.map(k => k+' ('+data.errors[k]+')').join(' · ');
+    } else {
+      errBanner.style.display='none';
+    }
+    const lu = document.getElementById('lastUpdated');
+    if(data.last_updated){
+      const d = new Date(data.last_updated);
+      lu.textContent = 'última sincronização às ' + d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+    } else {
+      lu.textContent = 'aguardando primeira sincronização...';
+    }
+    renderStats();
+    render();
+  }
+
+  function accountColor(name){
+    const acct = (config.accounts||[]).find(a=>a.name===name);
+    return acct ? acct.color : '#888888';
+  }
+
+  // ---------- SETTINGS UI ----------
+  const COLOR_PALETTE = ['#2F6FED','#FF9900','#8B5CF6','#14B8A6','#EF4444','#F59E0B','#10B981','#EC4899','#6366F1','#84CC16'];
+
+  function renderSettingsForm(){
+    const grid = document.getElementById('settingsGrid');
+    grid.innerHTML = '';
+    config.accounts.forEach((acct, idx) => {
+      const card = document.createElement('div');
+      card.className = 'acct-card';
+      card.innerHTML = `
+        <button class="acct-remove" data-role="remove" title="Remover conta">✕</button>
+        <div class="acct-head">
+          <input type="color" value="${acct.color}" data-role="color">
+          <input type="text" value="${acct.name}" placeholder="Nome da empresa" data-role="name">
+        </div>
+        <div class="field-label">Link .ics publicado</div>
+        <input type="url" placeholder="https://outlook.office365.com/owa/calendar/.../calendar.ics" value="${acct.ics_url||''}" data-role="url">
+      `;
+      card.querySelector('[data-role=color]').addEventListener('input', e=>{ acct.color = e.target.value; });
+      card.querySelector('[data-role=name]').addEventListener('input', e=>{ acct.name = e.target.value; });
+      card.querySelector('[data-role=url]').addEventListener('input', e=>{ acct.ics_url = e.target.value; });
+      card.querySelector('[data-role=remove]').addEventListener('click', ()=>{
+        config.accounts.splice(idx, 1);
+        renderSettingsForm();
+      });
+      grid.appendChild(card);
+    });
+  }
+
+  document.getElementById('addAccountBtn').addEventListener('click', ()=>{
+    config.accounts.push({
+      name: '',
+      color: COLOR_PALETTE[config.accounts.length % COLOR_PALETTE.length],
+      ics_url: '',
+    });
+    renderSettingsForm();
+  });
+
+  document.getElementById('settingsToggle').addEventListener('click', ()=>{
+    document.getElementById('settingsPanel').classList.toggle('open');
+    document.getElementById('settingsToggle').classList.toggle('open');
+  });
+
+  document.getElementById('saveBtn').addEventListener('click', async ()=>{
+    config.refresh_minutes = parseInt(document.getElementById('intervalSelect').value,10);
+    const status = document.getElementById('saveStatus');
+    status.textContent = 'salvando...';
+    try{
+      await apiFetch('/api/config', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(config)});
+      status.textContent = 'salvo — sincronizando ✓';
+      renderLegend();
+      setTimeout(()=> loadEvents(), 1500);
+    }catch(err){
+      status.textContent = '';
+      alert('Não consegui salvar a configuração: ' + err.message);
+    }
+    setTimeout(()=> status.textContent='', 4000);
+  });
+
+  document.getElementById('refreshBtn').addEventListener('click', async ()=>{
+    const btn = document.getElementById('refreshBtn');
+    btn.classList.add('spinning');
+    try{
+      await apiFetch('/api/refresh', {method:'POST'});
+      setTimeout(async ()=>{ await loadEvents(); btn.classList.remove('spinning'); }, 1500);
+    }catch(err){
+      btn.classList.remove('spinning');
+      alert('Não consegui atualizar: ' + err.message);
+    }
+  });
+
+  // ---------- LEGEND / STATS ----------
+  function renderLegend(){
+    const legend = document.getElementById('legend');
+    legend.innerHTML = '';
+    config.accounts.forEach(acct=>{
+      const label = document.createElement('label');
+      const cb = document.createElement('input');
+      cb.type='checkbox'; cb.checked = visibility[acct.name] !== false;
+      cb.addEventListener('change', ()=>{ visibility[acct.name] = cb.checked; render(); });
+      const dot = document.createElement('span');
+      dot.className='dot'; dot.style.background = acct.color;
+      label.appendChild(cb); label.appendChild(dot);
+      label.appendChild(document.createTextNode(acct.name));
+      legend.appendChild(label);
+    });
+  }
+
+  function renderStats(){
+    const stats = document.getElementById('stats');
+    stats.innerHTML = '';
+    config.accounts.forEach(acct=>{
+      const count = events.filter(e=>e.account===acct.name).length;
+      const pill = document.createElement('div');
+      pill.className = 'stat-pill';
+      pill.innerHTML = `<span class="dot" style="background:${acct.color}"></span>${acct.name}: ${count} evt`;
+      stats.appendChild(pill);
+    });
+  }
+
+  // ---------- CALENDAR RENDER ----------
+  function fmtTime(d, allDay){ return allDay ? 'dia todo' : d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}); }
+  function sameDay(a,b){ return a.getFullYear()===b.getFullYear() && a.getMonth()===b.getMonth() && a.getDate()===b.getDate(); }
+  function visibleEvents(){ return events.filter(e=>visibility[e.account]!==false).sort((a,b)=>a.start-b.start); }
+  function escapeHtml(str){ return String(str).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+  function renderMonth(){
+    const panel = document.getElementById('calPanel');
+    panel.innerHTML = '';
+    const weekdaysRow = document.createElement('div');
+    weekdaysRow.className = 'weekdays';
+    DIAS_SEMANA.forEach(d=>{ const el=document.createElement('div'); el.textContent=d; weekdaysRow.appendChild(el); });
+    panel.appendChild(weekdaysRow);
+
+    const grid = document.createElement('div'); grid.className = 'grid';
+    const year = currentDate.getFullYear(), month = currentDate.getMonth();
+    const firstOfMonth = new Date(year, month, 1);
+    const gridStart = new Date(year, month, 1 - firstOfMonth.getDay());
+    const today = new Date();
+    const occs = visibleEvents();
+
+    for(let i=0;i<42;i++){
+      const cellDate = new Date(gridStart); cellDate.setDate(gridStart.getDate()+i);
+      const cell = document.createElement('div'); cell.className = 'cell';
+      if(cellDate.getMonth()!==month) cell.classList.add('out');
+      if(sameDay(cellDate, today)) cell.classList.add('today');
+      if(selectedDay && sameDay(cellDate, selectedDay)) cell.classList.add('selected');
+
+      const num = document.createElement('div'); num.className='daynum'; num.textContent = cellDate.getDate();
+      cell.appendChild(num);
+
+      const dayEvents = occs.filter(o=>sameDay(o.start, cellDate));
+      dayEvents.slice(0,3).forEach(o=>{
+        const chip = document.createElement('div');
+        chip.className='chip'; chip.style.background = o.color;
+        chip.textContent = (o.all_day ? '' : fmtTime(o.start,false)+' ') + o.summary;
+        cell.appendChild(chip);
+      });
+      if(dayEvents.length > 3){
+        const more = document.createElement('div');
+        more.className='more'; more.textContent = '+ '+(dayEvents.length-3)+' mais';
+        cell.appendChild(more);
+      }
+      cell.addEventListener('click', ()=>{ selectedDay = cellDate; render(); });
+      grid.appendChild(cell);
+    }
+    panel.appendChild(grid);
+    renderDetail();
+  }
+
+  function renderDetail(){
+    const detail = document.getElementById('detailPanel');
+    if(view !== 'month' || !selectedDay){ detail.style.display='none'; return; }
+    detail.style.display='block';
+    const occs = visibleEvents().filter(o=>sameDay(o.start, selectedDay));
+    const label = selectedDay.toLocaleDateString('pt-BR', {weekday:'long', day:'2-digit', month:'long'});
+    detail.innerHTML = '<h3>'+label+'</h3>';
+    if(!occs.length){ detail.innerHTML += '<div class="none">Sem eventos neste dia.</div>'; return; }
+    occs.forEach(o=>{
+      const row = document.createElement('div'); row.className = 'agenda-evt';
+      row.innerHTML = `<div class="bar" style="background:${o.color}"></div>
+        <div class="time">${fmtTime(o.start,o.all_day)}${o.all_day?'':' – '+fmtTime(o.end,false)}</div>
+        <div class="body"><div class="sum">${escapeHtml(o.summary)}</div>${o.location?'<div class="loc">'+escapeHtml(o.location)+'</div>':''}</div>`;
+      detail.appendChild(row);
+    });
+  }
+
+  function renderAgenda(){
+    document.getElementById('detailPanel').style.display='none';
+    const panel = document.getElementById('calPanel'); panel.innerHTML = '';
+    const list = document.createElement('div'); list.className = 'agenda-list';
+    const year = currentDate.getFullYear(), month = currentDate.getMonth();
+    const monthStart = new Date(year, month, 1);
+    const monthEnd = new Date(year, month+1, 0, 23,59,59);
+    const occs = visibleEvents().filter(o=> o.start <= monthEnd && o.start >= monthStart);
+
+    if(!occs.length){
+      list.innerHTML = '<div class="empty-state">Nenhum evento neste mês.</div>';
+      panel.appendChild(list); return;
+    }
+    const byDay = {};
+    occs.forEach(o=>{ const key = o.start.toDateString(); (byDay[key]=byDay[key]||[]).push(o); });
+    Object.keys(byDay).sort((a,b)=>new Date(a)-new Date(b)).forEach(key=>{
+      const dayEl = document.createElement('div'); dayEl.className='agenda-day';
+      const d = new Date(key);
+      dayEl.innerHTML = '<div class="agenda-day-label">'+d.toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long'})+'</div>';
+      byDay[key].forEach(o=>{
+        const row = document.createElement('div'); row.className = 'agenda-evt';
+        row.innerHTML = `<div class="bar" style="background:${o.color}"></div>
+          <div class="time">${fmtTime(o.start,o.all_day)}${o.all_day?'':' – '+fmtTime(o.end,false)}</div>
+          <div class="body"><div class="sum">${escapeHtml(o.summary)}</div>${o.location?'<div class="loc">'+escapeHtml(o.location)+'</div>':''}</div>`;
+        dayEl.appendChild(row);
+      });
+      list.appendChild(dayEl);
+    });
+    panel.appendChild(list);
+  }
+
+  function render(){
+    document.getElementById('monthLabel').textContent = MESES[currentDate.getMonth()] + ' de ' + currentDate.getFullYear();
+    if(view==='month') renderMonth(); else renderAgenda();
+  }
+
+  document.getElementById('prevBtn').addEventListener('click', ()=>{ currentDate.setMonth(currentDate.getMonth()-1); selectedDay=null; render(); });
+  document.getElementById('nextBtn').addEventListener('click', ()=>{ currentDate.setMonth(currentDate.getMonth()+1); selectedDay=null; render(); });
+  document.getElementById('todayBtn').addEventListener('click', ()=>{ currentDate = new Date(); selectedDay = new Date(); render(); });
+  document.getElementById('viewMonthBtn').addEventListener('click', ()=>{ view='month'; document.getElementById('viewMonthBtn').classList.add('active'); document.getElementById('viewAgendaBtn').classList.remove('active'); render(); });
+  document.getElementById('viewAgendaBtn').addEventListener('click', ()=>{ view='agenda'; document.getElementById('viewAgendaBtn').classList.add('active'); document.getElementById('viewMonthBtn').classList.remove('active'); render(); });
+
+  // ---------- KANBAN ----------
+  const KCOLUMNS = [
+    {status:'backlog', label:'Backlog'},
+    {status:'fazendo', label:'Fazendo'},
+    {status:'feito', label:'Feito'},
+  ];
+  const PRIORITY_COLOR = {urgente:'#E5484D', moderado:'#F5A524', nao_urgente:'#2DA44E'};
+
+  async function apiFetch(url, opts){
+    opts = opts || {};
+    const headers = Object.assign({}, opts.headers || {});
+    try{
+      headers['Authorization'] = 'Bearer ' + await window.getIdToken();
+    }catch(authErr){
+      throw new Error('sessão expirada — recarregue a página e faça login de novo.');
+    }
+    let res;
+    try{
+      res = await fetch(url, Object.assign({}, opts, {headers}));
+    }catch(networkErr){
+      throw new Error('Não consegui falar com o servidor (ele está no ar?).');
+    }
+    let body = null;
+    try{ body = await res.json(); }catch(_){/* resposta sem corpo JSON */}
+    if(!res.ok || (body && body.ok === false)){
+      const msg = (body && body.error) ? body.error : ('erro HTTP ' + res.status);
+      throw new Error(msg);
+    }
+    return body;
+  }
+
+  let tasks = [];
+  let editingTaskId = null;
+  let modalDefaultStatus = 'backlog';
+  let draggedTaskId = null;
+
+  async function loadTasks(){
+    tasks = await apiFetch('/api/tasks');
+    renderKanban();
+  }
+
+  function fmtDateShort(iso){
+    if(!iso) return '';
+    const [y,m,d] = iso.split('-');
+    return d+'/'+m;
+  }
+
+  function renderKanban(){
+    const board = document.getElementById('kanbanBoard');
+    board.innerHTML = '';
+
+    // datalist de empresas: contas configuradas + empresas já usadas em tarefas
+    const companySet = new Set((config?.accounts||[]).map(a=>a.name));
+    tasks.forEach(t => { if(t.company) companySet.add(t.company); });
+    const dl = document.getElementById('companyList');
+    dl.innerHTML = Array.from(companySet).map(c=>`<option value="${escapeHtml(c)}">`).join('');
+
+    KCOLUMNS.forEach(col => {
+      const colTasks = tasks.filter(t=>t.status===col.status);
+      const kcol = document.createElement('div');
+      kcol.className = 'kcol';
+      kcol.innerHTML = `
+        <div class="kcol-head">
+          <div class="kcol-title">${col.label} <span class="count">${colTasks.length}</span></div>
+          <button class="kcol-add" data-status="${col.status}" title="Nova tarefa">+</button>
+        </div>
+        <div class="kcol-body" data-status="${col.status}"></div>
+      `;
+      const body = kcol.querySelector('.kcol-body');
+
+      if(!colTasks.length){
+        const empty = document.createElement('div');
+        empty.className = 'kcol-empty';
+        empty.textContent = 'Sem tarefas';
+        body.appendChild(empty);
+      }
+
+      colTasks.forEach(t => {
+        const card = document.createElement('div');
+        card.className = 'tcard';
+        card.draggable = true;
+        card.style.setProperty('--pcolor', PRIORITY_COLOR[t.priority] || '#999');
+        card.dataset.id = t.id;
+        const dates = (t.start_date || t.end_date)
+          ? (fmtDateShort(t.start_date) + (t.end_date ? ' → ' + fmtDateShort(t.end_date) : ''))
+          : '';
+        card.innerHTML = `
+          <div class="tc-top"><div class="tc-title">${escapeHtml(t.title)}</div></div>
+          ${t.company ? `<span class="tc-company">${escapeHtml(t.company)}</span>` : ''}
+          ${t.description ? `<div class="tc-desc">${escapeHtml(t.description)}</div>` : ''}
+          ${dates ? `<div class="tc-dates">${dates}</div>` : ''}
+        `;
+        card.addEventListener('click', ()=> openTaskModal(t));
+        card.addEventListener('dragstart', ()=>{ draggedTaskId = t.id; card.classList.add('dragging'); });
+        card.addEventListener('dragend', ()=>{ card.classList.remove('dragging'); });
+        body.appendChild(card);
+      });
+
+      body.addEventListener('dragover', (e)=>{ e.preventDefault(); body.classList.add('drag-over'); });
+      body.addEventListener('dragleave', ()=>{ body.classList.remove('drag-over'); });
+      body.addEventListener('drop', async (e)=>{
+        e.preventDefault();
+        body.classList.remove('drag-over');
+        if(!draggedTaskId) return;
+        const task = tasks.find(t=>t.id===draggedTaskId);
+        const taskIdToMove = draggedTaskId;
+        draggedTaskId = null;
+        if(!task || task.status === col.status) return;
+
+        const previousStatus = task.status;
+        task.status = col.status; // otimista
+        renderKanban();
+        try{
+          await apiFetch('/api/tasks/'+taskIdToMove, {method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({status: col.status})});
+        }catch(err){
+          // não salvou de verdade: desfaz visualmente e avisa, em vez de deixar a tela mentir
+          task.status = previousStatus;
+          renderKanban();
+          alert('Não consegui mover a tarefa: ' + err.message + '\nTente novamente.');
+        }
+      });
+
+      kcol.querySelector('.kcol-add').addEventListener('click', ()=> openTaskModal(null, col.status));
+      board.appendChild(kcol);
+    });
+  }
+
+  function openTaskModal(task, defaultStatus){
+    editingTaskId = task ? task.id : null;
+    modalDefaultStatus = defaultStatus || (task ? task.status : 'backlog');
+    document.getElementById('taskModalTitle').textContent = task ? 'Editar tarefa' : 'Nova tarefa';
+    document.getElementById('taskId').value = task ? task.id : '';
+    document.getElementById('taskTitle').value = task ? task.title : '';
+    document.getElementById('taskCompany').value = task ? task.company : '';
+    document.getElementById('taskDescription').value = task ? task.description : '';
+    document.getElementById('taskStart').value = task ? task.start_date : '';
+    document.getElementById('taskEnd').value = task ? task.end_date : '';
+    document.getElementById('deleteTaskBtn').style.display = task ? 'block' : 'none';
+    document.getElementById('taskModalError').style.display = 'none';
+    setPriority(task ? task.priority : 'moderado');
+    document.getElementById('taskModalOverlay').style.display = 'flex';
+    document.getElementById('taskTitle').focus();
+  }
+
+  function closeTaskModal(){
+    document.getElementById('taskModalOverlay').style.display = 'none';
+  }
+
+  function setPriority(p){
+    document.querySelectorAll('.priority-opt').forEach(el=>{
+      el.classList.toggle('selected', el.dataset.p === p);
+    });
+  }
+
+  document.getElementById('priorityPicker').addEventListener('click', (e)=>{
+    const opt = e.target.closest('.priority-opt');
+    if(opt) setPriority(opt.dataset.p);
+  });
+
+  document.getElementById('cancelTaskBtn').addEventListener('click', closeTaskModal);
+  document.getElementById('taskModalOverlay').addEventListener('click', (e)=>{
+    if(e.target.id === 'taskModalOverlay') closeTaskModal();
+  });
+
+  document.getElementById('saveTaskBtn').addEventListener('click', async ()=>{
+    const title = document.getElementById('taskTitle').value.trim();
+    const errEl = document.getElementById('taskModalError');
+    if(!title){
+      errEl.textContent = 'Título é obrigatório.';
+      errEl.style.display = 'block';
+      return;
+    }
+    const selectedPriority = document.querySelector('.priority-opt.selected');
+    const payload = {
+      title,
+      company: document.getElementById('taskCompany').value.trim(),
+      description: document.getElementById('taskDescription').value.trim(),
+      start_date: document.getElementById('taskStart').value,
+      end_date: document.getElementById('taskEnd').value,
+      priority: selectedPriority ? selectedPriority.dataset.p : 'moderado',
+    };
+
+    const saveBtn = document.getElementById('saveTaskBtn');
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Salvando...';
+    errEl.style.display = 'none';
+    try{
+      if(editingTaskId){
+        await apiFetch('/api/tasks/'+editingTaskId, {method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)});
+      } else {
+        payload.status = modalDefaultStatus;
+        await apiFetch('/api/tasks', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)});
+      }
+      closeTaskModal();
+      await loadTasks();
+    }catch(err){
+      // não fecha o modal: o usuário vê exatamente por que não salvou
+      errEl.textContent = 'Não consegui salvar: ' + err.message + ' — tente de novo.';
+      errEl.style.display = 'block';
+    }finally{
+      saveBtn.disabled = false;
+      saveBtn.textContent = 'Salvar';
+    }
+  });
+
+  document.getElementById('deleteTaskBtn').addEventListener('click', async ()=>{
+    if(!editingTaskId) return;
+    if(!confirm('Excluir esta tarefa?')) return;
+    try{
+      await apiFetch('/api/tasks/'+editingTaskId, {method:'DELETE'});
+      closeTaskModal();
+      await loadTasks();
+    }catch(err){
+      alert('Não consegui excluir a tarefa: ' + err.message);
+    }
+  });
+
+  // ---------- INIT + POLLING ----------
+  // não roda sozinho: é chamado pelo módulo de autenticação (abaixo)
+  // depois que o login com Google for confirmado e aceito pelo servidor.
+  window.startApp = async function(){
+    try{
+      await loadConfig();
+      await loadEvents();
+      await loadTasks();
+      render();
+      setInterval(loadEvents, 60*1000); // reconsulta o cache do servidor a cada 1 min
+    }catch(err){
+      if(err.message && err.message.includes('não tem acesso') && window.forceSignOut){
+        window.forceSignOut('Esse login não tem acesso a este app.');
+      } else {
+        alert('Não consegui carregar seus dados: ' + err.message + '\nRecarregue a página pra tentar de novo.');
+      }
+    }
+  };
+})();
+</script>
+
+</div><!-- /#appShell -->
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import {
+    getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged
+  } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+  const loginOverlay = document.getElementById('loginOverlay');
+  const appShell = document.getElementById('appShell');
+  const loginError = document.getElementById('loginError');
+  const googleLoginBtn = document.getElementById('googleLoginBtn');
+  const userChip = document.getElementById('userChip');
+
+  let auth = null;
+  let appStarted = false;
+
+  function showLogin(message){
+    loginOverlay.style.display = 'flex';
+    appShell.style.display = 'none';
+    userChip.style.display = 'none';
+    if(message){
+      loginError.textContent = message;
+      loginError.style.display = 'block';
+    } else {
+      loginError.style.display = 'none';
+    }
+  }
+
+  function showApp(user){
+    loginOverlay.style.display = 'none';
+    appShell.style.display = 'block';
+    userChip.style.display = 'flex';
+    userChip.innerHTML = (user.photoURL ? `<img src="${user.photoURL}">` : '') +
+      `<span>${user.email}</span><button id="logoutBtn">sair</button>`;
+    document.getElementById('logoutBtn').addEventListener('click', ()=> signOut(auth));
+
+    if(!appStarted){
+      appStarted = true;
+      // window.startApp é definido pelo outro <script> (a lógica do dashboard)
+      window.startApp();
+    }
+  }
+
+  // exposto pro script "clássico" (não-module) conseguir pegar o token em cada fetch
+  window.getIdToken = async function(){
+    if(!auth || !auth.currentUser) throw new Error('sessão expirada, faça login de novo');
+    return auth.currentUser.getIdToken();
+  };
+
+  window.forceSignOut = function(message){
+    appStarted = false;
+    signOut(auth).finally(()=> showLogin(message));
+  };
+
+  async function init(){
+    let cfg;
+    try{
+      const r = await fetch('/api/firebase-config');
+      cfg = await r.json();
+    }catch(e){
+      showLogin('Não consegui carregar a configuração do servidor. Ele está no ar?');
+      return;
+    }
+    if(!cfg.apiKey){
+      showLogin('Servidor sem configuração do Firebase (variáveis de ambiente FIREBASE_WEB_* faltando).');
+      return;
+    }
+
+    const app = initializeApp(cfg);
+    auth = getAuth(app);
+
+    googleLoginBtn.addEventListener('click', async ()=>{
+      loginError.style.display = 'none';
+      const provider = new GoogleAuthProvider();
+      try{
+        await signInWithPopup(auth, provider);
+      }catch(e){
+        loginError.textContent = 'Não consegui entrar: ' + e.message;
+        loginError.style.display = 'block';
+      }
+    });
+
+    onAuthStateChanged(auth, (user)=>{
+      if(user){
+        showApp(user);
+      } else {
+        showLogin();
+      }
+    });
+  }
+
+  init();
+</script>
+</body>
+</html>

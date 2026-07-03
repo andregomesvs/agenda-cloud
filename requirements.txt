@@ -1,0 +1,5 @@
+flask
+requests
+icalendar
+recurring-ical-events
+firebase-admin
