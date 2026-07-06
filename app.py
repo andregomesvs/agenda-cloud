@@ -255,17 +255,25 @@ def load_personal_events():
     return [d.to_dict() for d in docs]
 
 
+def _valid_hex_color(c):
+    import re
+    return bool(c) and bool(re.fullmatch(r"#[0-9a-fA-F]{6}", c))
+
+
 def create_personal_event(data):
     title = (data.get("title") or "").strip()
     date = (data.get("date") or "").strip()
     start_time = (data.get("start_time") or "").strip()
     end_time = (data.get("end_time") or "").strip()
+    color = (data.get("color") or "").strip()
     if not title:
         raise ValueError("título é obrigatório")
     if not date:
         raise ValueError("data é obrigatória")
     if not start_time or not end_time:
         raise ValueError("horário de início e fim são obrigatórios")
+    if not _valid_hex_color(color):
+        color = PERSONAL_COLOR
 
     now_iso = datetime.now().isoformat()
     evt = {
@@ -274,6 +282,7 @@ def create_personal_event(data):
         "date": date,
         "start_time": start_time,
         "end_time": end_time,
+        "color": color,
         "created_at": now_iso,
         "updated_at": now_iso,
     }
@@ -302,6 +311,9 @@ def update_personal_event(evt_id, data):
         updates["start_time"] = (data.get("start_time") or "").strip()
     if "end_time" in data:
         updates["end_time"] = (data.get("end_time") or "").strip()
+    if "color" in data:
+        color = (data.get("color") or "").strip()
+        updates["color"] = color if _valid_hex_color(color) else PERSONAL_COLOR
     updates["updated_at"] = datetime.now().isoformat()
 
     ref.update(updates)
