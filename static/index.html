@@ -83,6 +83,8 @@
   .daynum{font-size:12.5px;font-weight:600;color:var(--text);display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;}
   .cell.today .daynum{background:var(--today-ring);color:#fff;}
   .chip{font-size:10.8px;padding:2px 6px;border-radius:5px;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#fff;font-weight:600;}
+  .chip.evt-past{opacity:.55;}
+  .agenda-evt.evt-past{opacity:.55;}
   .more{font-size:10.5px;color:var(--muted);margin-top:3px;font-weight:600;}
 
   .agenda-list{padding:6px 0;}
@@ -337,7 +339,10 @@
     <input type="hidden" id="pevId">
 
     <div class="field-label">Título</div>
-    <input type="text" id="pevTitle" placeholder="Ex: Academia">
+    <div style="display:flex; gap:8px; align-items:center;">
+      <input type="color" id="pevColor" value="#7C3AED" title="Cor do evento" style="width:38px;height:38px;border:none;padding:0;border-radius:8px;cursor:pointer;flex:none;background:none;">
+      <input type="text" id="pevTitle" placeholder="Ex: Academia" style="flex:1;">
+    </div>
 
     <div class="field-label">Data</div>
     <input type="date" id="pevDate">
@@ -534,6 +539,7 @@
   // ---------- CALENDAR RENDER ----------
   function fmtTime(d, allDay){ return allDay ? 'dia todo' : d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}); }
   function sameDay(a,b){ return a.getFullYear()===b.getFullYear() && a.getMonth()===b.getMonth() && a.getDate()===b.getDate(); }
+  function isPastEvent(evt){ return evt.end.getTime() <= Date.now(); }
   function toDateInputValue(d){
     const pad = n => String(n).padStart(2,'0');
     return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
@@ -550,7 +556,7 @@
         location: '',
         all_day: false,
         account: 'Pessoal',
-        color: PERSONAL_COLOR,
+        color: p.color || PERSONAL_COLOR,
         isPersonal: true,
         raw: p,
       };
@@ -591,7 +597,9 @@
       const dayEvents = occs.filter(o=>sameDay(o.start, cellDate));
       dayEvents.slice(0,3).forEach(o=>{
         const chip = document.createElement('div');
-        chip.className='chip'; chip.style.background = o.color;
+        const past = isPastEvent(o);
+        chip.className='chip' + (past ? ' evt-past' : '');
+        chip.style.background = past ? '#9AA2AC' : o.color;
         chip.textContent = (o.all_day ? '' : fmtTime(o.start,false)+' ') + o.summary;
         cell.appendChild(chip);
       });
@@ -630,7 +638,9 @@
     occs.forEach(o=>{
       const row = document.createElement('div'); row.className = 'agenda-evt';
       if(o.isPersonal) row.classList.add('agenda-evt-personal');
-      row.innerHTML = `<div class="bar" style="background:${o.color}"></div>
+      const past = isPastEvent(o);
+      if(past) row.classList.add('evt-past');
+      row.innerHTML = `<div class="bar" style="background:${past ? '#9AA2AC' : o.color}"></div>
         <div class="time">${fmtTime(o.start,o.all_day)}${o.all_day?'':' – '+fmtTime(o.end,false)}</div>
         <div class="body"><div class="sum">${escapeHtml(o.summary)}</div>${o.location?'<div class="loc">'+escapeHtml(o.location)+'</div>':''}</div>`;
       if(o.isPersonal){
@@ -663,7 +673,9 @@
       byDay[key].forEach(o=>{
         const row = document.createElement('div'); row.className = 'agenda-evt';
         if(o.isPersonal) row.classList.add('agenda-evt-personal');
-        row.innerHTML = `<div class="bar" style="background:${o.color}"></div>
+        const past = isPastEvent(o);
+        if(past) row.classList.add('evt-past');
+        row.innerHTML = `<div class="bar" style="background:${past ? '#9AA2AC' : o.color}"></div>
           <div class="time">${fmtTime(o.start,o.all_day)}${o.all_day?'':' – '+fmtTime(o.end,false)}</div>
           <div class="body"><div class="sum">${escapeHtml(o.summary)}</div>${o.location?'<div class="loc">'+escapeHtml(o.location)+'</div>':''}</div>`;
         if(o.isPersonal){
@@ -736,6 +748,8 @@
     personalEvents = await apiFetch('/api/personal-events');
   }
 
+  let lastPevColor = PERSONAL_COLOR;
+
   function openPersonalEventModal(existing, defaultDate){
     editingPevId = existing ? existing.id : null;
     document.getElementById('personalEventModalTitle').textContent = existing ? 'Editar evento' : 'Novo evento';
@@ -744,6 +758,7 @@
     document.getElementById('pevDate').value = existing ? existing.date : (defaultDate || toDateInputValue(new Date()));
     document.getElementById('pevStart').value = existing ? existing.start_time : '';
     document.getElementById('pevEnd').value = existing ? existing.end_time : '';
+    document.getElementById('pevColor').value = existing ? (existing.color || PERSONAL_COLOR) : lastPevColor;
     document.getElementById('deletePevBtn').style.display = existing ? 'block' : 'none';
     document.getElementById('pevModalError').style.display = 'none';
     document.getElementById('personalEventModalOverlay').style.display = 'flex';
@@ -766,6 +781,7 @@
       date: document.getElementById('pevDate').value,
       start_time: document.getElementById('pevStart').value,
       end_time: document.getElementById('pevEnd').value,
+      color: document.getElementById('pevColor').value,
     };
     if(!payload.title || !payload.date || !payload.start_time || !payload.end_time){
       errEl.textContent = 'Preenche título, data e os dois horários.';
@@ -781,6 +797,7 @@
       } else {
         await apiFetch('/api/personal-events', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)});
       }
+      lastPevColor = payload.color;
       closePersonalEventModal();
       await loadPersonalEvents();
       render();
@@ -1060,6 +1077,7 @@
       setInterval(loadEvents, 60*1000); // reconsulta o cache do servidor a cada 1 min
       setInterval(async ()=>{ await loadPersonalEvents(); render(); }, 60*1000); // pega eventos pessoais criados em outra aba/dispositivo
       setInterval(checkUpcomingNotifications, 20*1000); // dispara aviso quando um compromisso está começando
+      setInterval(render, 60*1000); // atualiza o visual (cinza) de compromissos que acabaram de passar
     }catch(err){
       if(err.message && err.message.includes('não tem acesso') && window.forceSignOut){
         window.forceSignOut('Esse login não tem acesso a este app.');
