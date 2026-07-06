@@ -1,0 +1,9 @@
+{
+  "accounts": [
+    {"name": "Implanta", "color": "#2F6FED", "ics_url": ""},
+    {"name": "GFT", "color": "#FF9900", "ics_url": ""}
+  ],
+  "refresh_minutes": 5,
+  "window_days_past": 90,
+  "window_days_future": 270
+}

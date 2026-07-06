@@ -97,8 +97,11 @@
   .empty-state{padding:50px 20px;text-align:center;color:var(--muted-2);font-size:13.5px;}
 
   .detail{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);margin-top:16px;padding:18px 20px;box-shadow:var(--shadow);}
-  .detail h3{margin:0 0 12px;font-size:14.5px;text-transform:capitalize;}
+  .detail h3{margin:0;font-size:14.5px;text-transform:capitalize;}
   .detail .none{color:var(--muted-2);font-size:13px;}
+  .detail-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;gap:10px;}
+  .agenda-evt-personal{cursor:pointer;border-radius:8px;margin:0 -8px;padding:6px 8px;}
+  .agenda-evt-personal:hover{background:#FAFBFC;}
 
   /* ---------- KANBAN ---------- */
   .kanban-section{margin-top:40px;}
@@ -203,6 +206,10 @@
       <button class="refresh-btn" id="refreshBtn">
         <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M13.65 2.35A7 7 0 1015 8h-1.5" stroke="#161B22" stroke-width="1.4" stroke-linecap="round"/><path d="M15 2v4h-4" stroke="#161B22" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
         atualizar agora
+      </button>
+      <button class="refresh-btn" id="notifyBtn" title="Avisar no navegador quando um compromisso estiver começando (só com a aba aberta)">
+        <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M8 1.5a3 3 0 00-3 3v1.2C5 7.5 4 8.5 4 10.5v.5H2v1h12v-1h-2v-.5c0-2-1-3-1-5.8V4.5a3 3 0 00-3-3z" stroke="#161B22" stroke-width="1.1" stroke-linejoin="round"/><path d="M6.3 13.5a1.8 1.8 0 003.4 0" stroke="#161B22" stroke-width="1.1"/></svg>
+        <span id="notifyBtnLabel">notificações</span>
       </button>
       <div class="user-chip" id="userChip" style="display:none;"></div>
     </div>
@@ -324,17 +331,53 @@
   </div>
 </div>
 
+<div class="modal-overlay" id="personalEventModalOverlay" style="display:none;">
+  <div class="modal">
+    <h3 id="personalEventModalTitle">Novo evento</h3>
+    <input type="hidden" id="pevId">
+
+    <div class="field-label">Título</div>
+    <input type="text" id="pevTitle" placeholder="Ex: Academia">
+
+    <div class="field-label">Data</div>
+    <input type="date" id="pevDate">
+
+    <div class="date-row">
+      <div>
+        <div class="field-label">Início</div>
+        <input type="time" id="pevStart">
+      </div>
+      <div>
+        <div class="field-label">Fim</div>
+        <input type="time" id="pevEnd">
+      </div>
+    </div>
+
+    <div class="modal-error" id="pevModalError"></div>
+
+    <div class="modal-footer">
+      <button class="btn-danger" id="deletePevBtn" style="display:none;">Excluir evento</button>
+      <div class="modal-actions" style="margin-left:auto;">
+        <button class="btn-ghost2" id="cancelPevBtn">Cancelar</button>
+        <button class="btn btn-primary" id="savePevBtn">Salvar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
 (function(){
   const MESES = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
   const DIAS_SEMANA = ['dom','seg','ter','qua','qui','sex','sáb'];
+  const PERSONAL_COLOR = '#7C3AED';
 
   let config = null;
   let events = []; // eventos vindos do servidor, já com Date objects
+  let personalEvents = []; // eventos manuais (agenda pessoal), crus da API
   let currentDate = new Date();
   let selectedDay = null;
   let view = 'month';
-  let visibility = {}; // por nome de conta
+  let visibility = {'Pessoal': true}; // por nome de conta (+ "Pessoal")
 
   async function loadConfig(){
     config = await apiFetch('/api/config');
@@ -458,6 +501,16 @@
       label.appendChild(document.createTextNode(acct.name));
       legend.appendChild(label);
     });
+    // toggle da agenda pessoal (eventos manuais), sempre presente
+    const pLabel = document.createElement('label');
+    const pCb = document.createElement('input');
+    pCb.type='checkbox'; pCb.checked = visibility['Pessoal'] !== false;
+    pCb.addEventListener('change', ()=>{ visibility['Pessoal'] = pCb.checked; render(); });
+    const pDot = document.createElement('span');
+    pDot.className='dot'; pDot.style.background = PERSONAL_COLOR;
+    pLabel.appendChild(pCb); pLabel.appendChild(pDot);
+    pLabel.appendChild(document.createTextNode('Pessoal'));
+    legend.appendChild(pLabel);
   }
 
   function renderStats(){
@@ -470,12 +523,44 @@
       pill.innerHTML = `<span class="dot" style="background:${acct.color}"></span>${acct.name}: ${count} evt`;
       stats.appendChild(pill);
     });
+    if(personalEvents.length){
+      const pill = document.createElement('div');
+      pill.className = 'stat-pill';
+      pill.innerHTML = `<span class="dot" style="background:${PERSONAL_COLOR}"></span>Pessoal: ${personalEvents.length} evt`;
+      stats.appendChild(pill);
+    }
   }
 
   // ---------- CALENDAR RENDER ----------
   function fmtTime(d, allDay){ return allDay ? 'dia todo' : d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}); }
   function sameDay(a,b){ return a.getFullYear()===b.getFullYear() && a.getMonth()===b.getMonth() && a.getDate()===b.getDate(); }
-  function visibleEvents(){ return events.filter(e=>visibility[e.account]!==false).sort((a,b)=>a.start-b.start); }
+  function toDateInputValue(d){
+    const pad = n => String(n).padStart(2,'0');
+    return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
+  }
+  function personalEventsAsCalendarEvents(){
+    return personalEvents.map(p => {
+      const [y,m,d] = (p.date||'1970-01-01').split('-').map(Number);
+      const [sh,sm] = (p.start_time||'00:00').split(':').map(Number);
+      const [eh,em] = (p.end_time||p.start_time||'00:00').split(':').map(Number);
+      return {
+        start: new Date(y, m-1, d, sh||0, sm||0),
+        end: new Date(y, m-1, d, eh||0, em||0),
+        summary: p.title,
+        location: '',
+        all_day: false,
+        account: 'Pessoal',
+        color: PERSONAL_COLOR,
+        isPersonal: true,
+        raw: p,
+      };
+    });
+  }
+  function visibleEvents(){
+    const combined = events.filter(e=>visibility[e.account]!==false)
+      .concat(visibility['Pessoal']!==false ? personalEventsAsCalendarEvents() : []);
+    return combined.sort((a,b)=>a.start-b.start);
+  }
   function escapeHtml(str){ return String(str).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
   function renderMonth(){
@@ -528,13 +613,30 @@
     detail.style.display='block';
     const occs = visibleEvents().filter(o=>sameDay(o.start, selectedDay));
     const label = selectedDay.toLocaleDateString('pt-BR', {weekday:'long', day:'2-digit', month:'long'});
-    detail.innerHTML = '<h3>'+label+'</h3>';
-    if(!occs.length){ detail.innerHTML += '<div class="none">Sem eventos neste dia.</div>'; return; }
+    const dateStr = toDateInputValue(selectedDay);
+    detail.innerHTML = `<div class="detail-head">
+        <h3>${label}</h3>
+        <button class="btn-ghost2" id="addPersonalEventBtn">+ Adicionar evento</button>
+      </div>`;
+    document.getElementById('addPersonalEventBtn').addEventListener('click', ()=> openPersonalEventModal(null, dateStr));
+
+    if(!occs.length){
+      const none = document.createElement('div');
+      none.className = 'none';
+      none.textContent = 'Sem eventos neste dia.';
+      detail.appendChild(none);
+      return;
+    }
     occs.forEach(o=>{
       const row = document.createElement('div'); row.className = 'agenda-evt';
+      if(o.isPersonal) row.classList.add('agenda-evt-personal');
       row.innerHTML = `<div class="bar" style="background:${o.color}"></div>
         <div class="time">${fmtTime(o.start,o.all_day)}${o.all_day?'':' – '+fmtTime(o.end,false)}</div>
         <div class="body"><div class="sum">${escapeHtml(o.summary)}</div>${o.location?'<div class="loc">'+escapeHtml(o.location)+'</div>':''}</div>`;
+      if(o.isPersonal){
+        row.title = 'Clique pra editar';
+        row.addEventListener('click', ()=> openPersonalEventModal(o.raw, null));
+      }
       detail.appendChild(row);
     });
   }
@@ -560,9 +662,14 @@
       dayEl.innerHTML = '<div class="agenda-day-label">'+d.toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long'})+'</div>';
       byDay[key].forEach(o=>{
         const row = document.createElement('div'); row.className = 'agenda-evt';
+        if(o.isPersonal) row.classList.add('agenda-evt-personal');
         row.innerHTML = `<div class="bar" style="background:${o.color}"></div>
           <div class="time">${fmtTime(o.start,o.all_day)}${o.all_day?'':' – '+fmtTime(o.end,false)}</div>
           <div class="body"><div class="sum">${escapeHtml(o.summary)}</div>${o.location?'<div class="loc">'+escapeHtml(o.location)+'</div>':''}</div>`;
+        if(o.isPersonal){
+          row.title = 'Clique pra editar';
+          row.addEventListener('click', ()=> openPersonalEventModal(o.raw, null));
+        }
         dayEl.appendChild(row);
       });
       list.appendChild(dayEl);
@@ -620,6 +727,128 @@
   async function loadTasks(){
     tasks = await apiFetch('/api/tasks');
     renderKanban();
+  }
+
+  // ---------- EVENTOS PESSOAIS (agenda manual) ----------
+  let editingPevId = null;
+
+  async function loadPersonalEvents(){
+    personalEvents = await apiFetch('/api/personal-events');
+  }
+
+  function openPersonalEventModal(existing, defaultDate){
+    editingPevId = existing ? existing.id : null;
+    document.getElementById('personalEventModalTitle').textContent = existing ? 'Editar evento' : 'Novo evento';
+    document.getElementById('pevId').value = existing ? existing.id : '';
+    document.getElementById('pevTitle').value = existing ? existing.title : '';
+    document.getElementById('pevDate').value = existing ? existing.date : (defaultDate || toDateInputValue(new Date()));
+    document.getElementById('pevStart').value = existing ? existing.start_time : '';
+    document.getElementById('pevEnd').value = existing ? existing.end_time : '';
+    document.getElementById('deletePevBtn').style.display = existing ? 'block' : 'none';
+    document.getElementById('pevModalError').style.display = 'none';
+    document.getElementById('personalEventModalOverlay').style.display = 'flex';
+    document.getElementById('pevTitle').focus();
+  }
+
+  function closePersonalEventModal(){
+    document.getElementById('personalEventModalOverlay').style.display = 'none';
+  }
+
+  document.getElementById('cancelPevBtn').addEventListener('click', closePersonalEventModal);
+  document.getElementById('personalEventModalOverlay').addEventListener('click', (e)=>{
+    if(e.target.id === 'personalEventModalOverlay') closePersonalEventModal();
+  });
+
+  document.getElementById('savePevBtn').addEventListener('click', async ()=>{
+    const errEl = document.getElementById('pevModalError');
+    const payload = {
+      title: document.getElementById('pevTitle').value.trim(),
+      date: document.getElementById('pevDate').value,
+      start_time: document.getElementById('pevStart').value,
+      end_time: document.getElementById('pevEnd').value,
+    };
+    if(!payload.title || !payload.date || !payload.start_time || !payload.end_time){
+      errEl.textContent = 'Preenche título, data e os dois horários.';
+      errEl.style.display = 'block';
+      return;
+    }
+    const saveBtn = document.getElementById('savePevBtn');
+    saveBtn.disabled = true; saveBtn.textContent = 'Salvando...';
+    errEl.style.display = 'none';
+    try{
+      if(editingPevId){
+        await apiFetch('/api/personal-events/'+editingPevId, {method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)});
+      } else {
+        await apiFetch('/api/personal-events', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)});
+      }
+      closePersonalEventModal();
+      await loadPersonalEvents();
+      render();
+    }catch(err){
+      errEl.textContent = 'Não consegui salvar: ' + err.message;
+      errEl.style.display = 'block';
+    }finally{
+      saveBtn.disabled = false; saveBtn.textContent = 'Salvar';
+    }
+  });
+
+  document.getElementById('deletePevBtn').addEventListener('click', async ()=>{
+    if(!editingPevId) return;
+    if(!confirm('Excluir este evento?')) return;
+    try{
+      await apiFetch('/api/personal-events/'+editingPevId, {method:'DELETE'});
+      closePersonalEventModal();
+      await loadPersonalEvents();
+      render();
+    }catch(err){
+      alert('Não consegui excluir: ' + err.message);
+    }
+  });
+
+  // ---------- NOTIFICAÇÕES (Web Notification API - só com a aba aberta) ----------
+  const notifiedKeys = new Set();
+
+  function updateNotifyLabel(){
+    const label = document.getElementById('notifyBtnLabel');
+    if(!('Notification' in window)){ label.textContent = 'sem suporte'; return; }
+    if(Notification.permission === 'granted') label.textContent = 'notificações: ativas';
+    else if(Notification.permission === 'denied') label.textContent = 'notificações: bloqueadas';
+    else label.textContent = 'ativar notificações';
+  }
+
+  document.getElementById('notifyBtn').addEventListener('click', async ()=>{
+    if(!('Notification' in window)){
+      alert('Seu navegador não suporta notificações.');
+      return;
+    }
+    if(Notification.permission === 'denied'){
+      alert('As notificações foram bloqueadas pra este site. Pra reativar, clica no cadeado ao lado do endereço e permite notificações manualmente.');
+      return;
+    }
+    await Notification.requestPermission();
+    updateNotifyLabel();
+    if(Notification.permission === 'granted'){
+      new Notification('Notificações ativadas', {body: 'Você vai ser avisado aqui quando um compromisso estiver começando (com esta aba aberta).'});
+    }
+  });
+
+  function checkUpcomingNotifications(){
+    if(!('Notification' in window) || Notification.permission !== 'granted') return;
+    const now = new Date();
+    const todos = visibleEvents(); // já mescla calendário + pessoal
+    todos.forEach(evt => {
+      if(evt.all_day) return;
+      const key = (evt.isPersonal ? 'p:'+evt.raw.id : 's:'+evt.summary+evt.start.toISOString());
+      if(notifiedKeys.has(key)) return;
+      const diffMs = evt.start.getTime() - now.getTime();
+      // dispara numa janela de -30s a +60s do horário de início
+      if(diffMs <= 60000 && diffMs >= -30000){
+        notifiedKeys.add(key);
+        new Notification(evt.summary, {
+          body: evt.isPersonal ? 'Começando agora' : ('Começando agora' + (evt.location ? ' · ' + evt.location : '')),
+        });
+      }
+    });
   }
 
   function fmtDateShort(iso){
@@ -825,8 +1054,12 @@
       await loadConfig();
       await loadEvents();
       await loadTasks();
+      await loadPersonalEvents();
       render();
+      updateNotifyLabel();
       setInterval(loadEvents, 60*1000); // reconsulta o cache do servidor a cada 1 min
+      setInterval(async ()=>{ await loadPersonalEvents(); render(); }, 60*1000); // pega eventos pessoais criados em outra aba/dispositivo
+      setInterval(checkUpcomingNotifications, 20*1000); // dispara aviso quando um compromisso está começando
     }catch(err){
       if(err.message && err.message.includes('não tem acesso') && window.forceSignOut){
         window.forceSignOut('Esse login não tem acesso a este app.');

@@ -56,6 +56,7 @@ db = firestore.client()
 CONFIG_REF = db.collection("agenda").document("config")
 EVENTS_REF = db.collection("agenda").document("events_cache")
 TASKS_COL = db.collection("tasks")
+PERSONAL_EVENTS_COL = db.collection("personal_events")
 
 app = Flask(__name__, static_folder="static", static_url_path="")
 
@@ -244,6 +245,77 @@ def delete_task(task_id):
     return True
 
 
+# ---------- EVENTOS PESSOAIS (agenda manual, tipo Google Agenda) ----------
+
+PERSONAL_COLOR = "#7C3AED"  # roxo fixo, pra diferenciar visualmente dos calendários importados
+
+
+def load_personal_events():
+    docs = PERSONAL_EVENTS_COL.stream()
+    return [d.to_dict() for d in docs]
+
+
+def create_personal_event(data):
+    title = (data.get("title") or "").strip()
+    date = (data.get("date") or "").strip()
+    start_time = (data.get("start_time") or "").strip()
+    end_time = (data.get("end_time") or "").strip()
+    if not title:
+        raise ValueError("título é obrigatório")
+    if not date:
+        raise ValueError("data é obrigatória")
+    if not start_time or not end_time:
+        raise ValueError("horário de início e fim são obrigatórios")
+
+    now_iso = datetime.now().isoformat()
+    evt = {
+        "id": str(uuid.uuid4()),
+        "title": title,
+        "date": date,
+        "start_time": start_time,
+        "end_time": end_time,
+        "created_at": now_iso,
+        "updated_at": now_iso,
+    }
+    PERSONAL_EVENTS_COL.document(evt["id"]).set(evt)
+    return evt
+
+
+def update_personal_event(evt_id, data):
+    ref = PERSONAL_EVENTS_COL.document(evt_id)
+    snap = ref.get()
+    if not snap.exists:
+        return None
+
+    updates = {}
+    if "title" in data:
+        title = (data.get("title") or "").strip()
+        if not title:
+            raise ValueError("título é obrigatório")
+        updates["title"] = title
+    if "date" in data:
+        date = (data.get("date") or "").strip()
+        if not date:
+            raise ValueError("data é obrigatória")
+        updates["date"] = date
+    if "start_time" in data:
+        updates["start_time"] = (data.get("start_time") or "").strip()
+    if "end_time" in data:
+        updates["end_time"] = (data.get("end_time") or "").strip()
+    updates["updated_at"] = datetime.now().isoformat()
+
+    ref.update(updates)
+    return ref.get().to_dict()
+
+
+def delete_personal_event(evt_id):
+    ref = PERSONAL_EVENTS_COL.document(evt_id)
+    if not ref.get().exists:
+        return False
+    ref.delete()
+    return True
+
+
 # ---------- AUTENTICAÇÃO ----------
 
 def require_auth(f):
@@ -366,6 +438,45 @@ def api_delete_task(task_id):
     ok = delete_task(task_id)
     if not ok:
         return jsonify({"ok": False, "error": "tarefa não encontrada"}), 404
+    return jsonify({"ok": True})
+
+
+@app.route("/api/personal-events", methods=["GET"])
+@require_auth
+def api_get_personal_events():
+    return jsonify(load_personal_events())
+
+
+@app.route("/api/personal-events", methods=["POST"])
+@require_auth
+def api_create_personal_event():
+    data = request.get_json(force=True) or {}
+    try:
+        evt = create_personal_event(data)
+    except ValueError as e:
+        return jsonify({"ok": False, "error": str(e)}), 400
+    return jsonify({"ok": True, "event": evt})
+
+
+@app.route("/api/personal-events/<evt_id>", methods=["PUT"])
+@require_auth
+def api_update_personal_event(evt_id):
+    data = request.get_json(force=True) or {}
+    try:
+        evt = update_personal_event(evt_id, data)
+    except ValueError as e:
+        return jsonify({"ok": False, "error": str(e)}), 400
+    if evt is None:
+        return jsonify({"ok": False, "error": "evento não encontrado"}), 404
+    return jsonify({"ok": True, "event": evt})
+
+
+@app.route("/api/personal-events/<evt_id>", methods=["DELETE"])
+@require_auth
+def api_delete_personal_event(evt_id):
+    ok = delete_personal_event(evt_id)
+    if not ok:
+        return jsonify({"ok": False, "error": "evento não encontrado"}), 404
     return jsonify({"ok": True})
 
 
